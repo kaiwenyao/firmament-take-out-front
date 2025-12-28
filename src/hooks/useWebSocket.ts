@@ -31,6 +31,10 @@ export function useWebSocket(options: WebSocketOptions) {
 
   const [status, setStatus] = useState<WebSocketStatus>(WebSocketStatus.CLOSED);
   const ws = useRef<WebSocket | null>(null);
+  const retryCountRef = useRef<number>(0); // 重连次数
+  const maxRetries = 10; // 最大重连次数
+  const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null); // 重连定时器
+  const connectRef = useRef<(() => void) | null>(null); // 存储 connect 函数引用
 
   // 保持回调最新
   const callbacksRef = useRef({ onOpen, onClose, onError, onMessage });
@@ -86,6 +90,7 @@ export function useWebSocket(options: WebSocketOptions) {
         // 双重校验：确保当前 socket 还是 ws.current (防止快速切换导致的竞态)
         if (ws.current === socket) {
           setStatus(WebSocketStatus.OPEN);
+          retryCountRef.current = 0; // 连接成功，重置重连次数
           callbacksRef.current.onOpen?.();
         }
       };
@@ -96,11 +101,24 @@ export function useWebSocket(options: WebSocketOptions) {
         }
       };
 
-      socket.onclose = () => {
+      socket.onclose = (event) => {
         if (ws.current === socket) {
           setStatus(WebSocketStatus.CLOSED);
           callbacksRef.current.onClose?.();
           ws.current = null; // 清理引用
+          
+          // 如果不是主动关闭（code 1000），且未达到最大重连次数，则尝试重连
+          if (event.code !== 1000 && retryCountRef.current < maxRetries) {
+            // 使用指数退避策略
+            const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
+            retryCountRef.current += 1;
+            
+            reconnectTimerRef.current = setTimeout(() => {
+              if (retryCountRef.current <= maxRetries && connectRef.current) {
+                connectRef.current();
+              }
+            }, delay);
+          }
         }
       };
 
@@ -117,6 +135,11 @@ export function useWebSocket(options: WebSocketOptions) {
     }
   }, [url, sid]); // 依赖项仅 url 和 sid
 
+  // 更新 connect 函数引用
+  useEffect(() => {
+    connectRef.current = connect;
+  }, [connect]);
+
   // --- 核心功能：发送消息 ---
   const send = useCallback((message: string) => {
     if (ws.current && ws.current.readyState === WebSocket.OPEN) {
@@ -130,11 +153,19 @@ export function useWebSocket(options: WebSocketOptions) {
   // --- 核心功能：强制重连 ---
   // 先断开，再连接
   const reconnect = useCallback(() => {
+    // 清除可能存在的重连定时器
+    if (reconnectTimerRef.current) {
+      clearTimeout(reconnectTimerRef.current);
+      reconnectTimerRef.current = null;
+    }
+    
+    // 重置重连次数
+    retryCountRef.current = 0;
+    
     disconnect();
     // 由于 disconnect 是异步的（close 事件），为了确保断开后再连，
-    // 这里做一个简单的延时，或者直接依赖 react 的 state 变化有点复杂。
-    // 简单粗暴的做法是：
-    setTimeout(() => {
+    // 使用一个短暂的延时
+    reconnectTimerRef.current = setTimeout(() => {
       connect();
     }, 300);
   }, [disconnect, connect]);
@@ -159,6 +190,11 @@ export function useWebSocket(options: WebSocketOptions) {
       isMounted = false;
       if (timer !== undefined) {
         clearTimeout(timer); // 防止组件快速卸载时尝试连接
+      }
+      // 清除重连定时器
+      if (reconnectTimerRef.current) {
+        clearTimeout(reconnectTimerRef.current);
+        reconnectTimerRef.current = null;
       }
       // 确保 disconnect 函数存在且 ws.current 存在时才调用
       try {

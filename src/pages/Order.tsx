@@ -470,35 +470,37 @@ export default function Order() {
         onValueChange={(value) => handleStatusChange(stringToStatus(value))}
         className="w-full"
       >
-        <TabsList className="h-auto p-0 bg-white border-b border-gray-200 rounded-t-lg rounded-b-none w-full justify-start">
-          {ORDER_STATUS_ORDER.map((status) => {
-            const config = ORDER_STATUS_CONFIG[status];
-            const count = getStatusCount(status);
-            // 只有待接单(2)、待派送(3)、派送中(4)显示 badge，无论是否选中都显示
-            const showBadge = (status === 2 || status === 3 || status === 4) && count > 0;
-            
-            return (
-              <TabsTrigger
-                key={status}
-                value={statusToString(status)}
-                className={`
-                  relative px-6 py-3 text-sm font-medium rounded-none border-r border-gray-200 last:border-r-0
-                  data-[state=active]:bg-[#ffc200] data-[state=active]:text-gray-900
-                  data-[state=inactive]:bg-white data-[state=inactive]:text-gray-700
-                  hover:bg-gray-50
-                `}
-              >
-                {config.label}
-                {/* 显示红色小圆点 badge（仅待接单(2)、待派送(3)、派送中(4)） */}
-                {showBadge && (
-                  <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] text-white px-1">
-                    {count > 99 ? "99+" : count}
-                  </span>
-                )}
-              </TabsTrigger>
-            );
-          })}
-        </TabsList>
+        <div className="bg-white border-b border-gray-200 rounded-t-lg rounded-b-none border-r border-gray-200">
+          <TabsList className="h-auto p-0 bg-transparent w-auto max-w-2xl">
+            {ORDER_STATUS_ORDER.map((status) => {
+              const config = ORDER_STATUS_CONFIG[status];
+              const count = getStatusCount(status);
+              // 只有待接单(2)、待派送(3)、派送中(4)显示 badge，无论是否选中都显示
+              const showBadge = (status === 2 || status === 3 || status === 4) && count > 0;
+              
+              return (
+                <TabsTrigger
+                  key={status}
+                  value={statusToString(status)}
+                  className={`
+                    relative flex-1 min-w-[100px] px-4 py-3 text-sm font-medium rounded-none border-r border-gray-200
+                    data-[state=active]:bg-[#ffc200] data-[state=active]:text-gray-900
+                    data-[state=inactive]:bg-white data-[state=inactive]:text-gray-700
+                    hover:bg-gray-50
+                  `}
+                >
+                  {config.label}
+                  {/* 显示红色小圆点 badge（仅待接单(2)、待派送(3)、派送中(4)） */}
+                  {showBadge && (
+                    <span className="absolute top-1 right-1 min-w-[16px] h-4 bg-red-500 rounded-full flex items-center justify-center text-[10px] text-white px-1">
+                      {count > 99 ? "99+" : count}
+                    </span>
+                  )}
+                </TabsTrigger>
+              );
+            })}
+          </TabsList>
+        </div>
       </Tabs>
 
       {/* 搜索区域 */}

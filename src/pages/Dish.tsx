@@ -346,44 +346,40 @@ export default function Dish() {
       return [];
     }
     
-    // 按名称分组，因为同一个类型可能有多个口味值
-    const grouped: Record<string, ExtendedFlavor> = {};
-    
-    flavors.forEach((flavor) => {
+    return flavors.map((flavor) => {
       const type = flavor.name as FlavorType;
       // 验证类型是否有效
       if (!FLAVOR_OPTIONS[type]) {
-        return; // 跳过无效的类型
+        return null;
       }
       
-      if (!grouped[type]) {
-        grouped[type] = {
-          type,
-          name: flavor.name,
-          value: "",
-          removedOptions: [],
-        };
+      // 解析 value（JSON 字符串）为选项数组
+      let currentOptions: string[] = [];
+      try {
+        if (flavor.value) {
+          // value 可能是 JSON 字符串，需要解析
+          currentOptions = JSON.parse(flavor.value);
+        }
+      } catch (e) {
+        // 如果解析失败，可能是旧格式（逗号分隔），尝试兼容
+        currentOptions = flavor.value.split(",").filter(Boolean);
       }
-      // 收集所有值
-      if (grouped[type].value) {
-        grouped[type].value += "," + flavor.value;
-      } else {
-        grouped[type].value = flavor.value;
-      }
-    });
-    
-    return Object.values(grouped).map((item) => {
+      
       // 计算已删除的选项
-      const allOptions = FLAVOR_OPTIONS[item.type as FlavorType] || [];
-      const currentValues = item.value.split(",").filter(Boolean);
+      const allOptions = FLAVOR_OPTIONS[type] || [];
       const removedOptions = allOptions.filter(
-        (opt) => !currentValues.includes(opt)
+        (opt) => !currentOptions.includes(opt)
       );
+      
       return {
-        ...item,
+        id: flavor.id, // 保留 id（编辑时使用）
+        dishId: flavor.dishId, // 保留 dishId（编辑时使用）
+        type,
+        name: flavor.name,
+        value: flavor.value, // 保留原始 value（JSON 字符串）
         removedOptions,
       };
-    });
+    }).filter((item): item is ExtendedFlavor => item !== null);
   };
 
   // 将扩展格式的口味转换为后端格式
@@ -398,12 +394,15 @@ export default function Dish() {
           (opt) => !(item.removedOptions || []).includes(opt)
         );
         
-        // 为每个选项创建一个口味
-        currentOptions.forEach((option) => {
-          flavors.push({
-            name: item.name,
-            value: option,
-          });
+        // 将选项数组转换为 JSON 字符串
+        const valueJsonString = JSON.stringify(currentOptions);
+        
+        // 每个口味类型只创建一个条目，value 是 JSON 字符串
+        flavors.push({
+          id: item.id, // 如果有 id，保留它（编辑时）
+          dishId: item.dishId, // 如果有 dishId，保留它（编辑时）
+          name: item.name,
+          value: valueJsonString, // JSON 字符串格式：'["无糖","少糖","半糖","多糖","全糖"]'
         });
       }
     });
@@ -446,8 +445,16 @@ export default function Dish() {
         status: dishDetail.status,
         flavors: flavors,
       });
-      // 转换口味数据
-      setExtendedFlavors(convertFlavorsToExtended(flavors));
+      // 转换口味数据（保留 id 和 dishId）
+      const extendedFlavors = convertFlavorsToExtended(flavors);
+      // 将 id 和 dishId 也传递到扩展格式中
+      extendedFlavors.forEach((extended, index) => {
+        if (flavors[index]) {
+          extended.id = flavors[index].id;
+          extended.dishId = flavors[index].dishId;
+        }
+      });
+      setExtendedFlavors(extendedFlavors);
       setImagePreview(dishDetail.image || "");
       setFormErrors({});
       setFormDialogOpen(true);
@@ -473,9 +480,9 @@ export default function Dish() {
       return;
     }
 
-    // 验证文件大小（2MB）
-    if (file.size > 2 * 1024 * 1024) {
-      setErrorMessage("图片大小不超过2M");
+    // 验证文件大小（10MB）
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage("图片大小不超过10M");
       setErrorDialogOpen(true);
       return;
     }
@@ -1353,9 +1360,9 @@ export default function Dish() {
                   disabled={formLoading || imageUploading}
                 />
                 <div className="flex-1 text-sm text-muted-foreground space-y-1">
-                  <p>图片大小不超过2M</p>
+                  <p>图片大小不超过10M</p>
                   <p>仅能上传PNG JPEG JPG类型图片</p>
-                  <p>建议上传200*200或300*300尺寸的图片</p>
+                  <p>建议上传方形图片</p>
                 </div>
               </div>
               {formErrors.image && (

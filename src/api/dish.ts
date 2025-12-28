@@ -1,5 +1,5 @@
 import request from "./request";
-import axios from "axios";
+import { uploadImage } from "@/utils/upload";
 
 // 菜品数据类型定义
 export interface Dish {
@@ -130,26 +130,7 @@ export const getDishById = async (id: string): Promise<Dish> => {
  * 上传图片
  * @param file 图片文件
  * @returns 图片URL
+ * @deprecated 请使用 @/utils/upload 中的 uploadImage
  */
-export const uploadImage = async (file: File): Promise<string> => {
-  const formData = new FormData();
-  formData.append("file", file);
-  
-  // 使用 axios 直接上传，不使用 request 拦截器（因为需要 multipart/form-data）
-  const token = localStorage.getItem("token");
-  
-  const response = await axios.post("/api/common/upload", formData, {
-    headers: {
-      "Content-Type": "multipart/form-data",
-      token: token || "",
-    },
-  });
-  
-  const res = response.data;
-  if (res.code === 1) {
-    return res.data;
-  } else {
-    throw new Error(res.msg || "上传失败");
-  }
-};
+export { uploadImage };
 

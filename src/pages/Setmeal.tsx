@@ -370,9 +370,9 @@ export default function Setmeal() {
       return;
     }
 
-    // 验证文件大小（2MB）
-    if (file.size > 2 * 1024 * 1024) {
-      setErrorMessage("图片大小不超过2M");
+    // 验证文件大小（10MB）
+    if (file.size > 10 * 1024 * 1024) {
+      setErrorMessage("图片大小不超过10M");
       setErrorDialogOpen(true);
       return;
     }
@@ -1069,9 +1069,9 @@ export default function Setmeal() {
                   disabled={formLoading || imageUploading}
                 />
                 <div className="flex-1 text-sm text-muted-foreground space-y-1">
-                  <p>图片大小不超过2M</p>
+                  <p>图片大小不超过10M</p>
                   <p>仅能上传PNG JPEG JPG类型图片</p>
-                  <p>建议上传200*200或300*300尺寸的图片</p>
+                  <p>建议上传方形图片</p>
                 </div>
               </div>
               {formErrors.image && (
