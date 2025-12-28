@@ -1,19 +1,16 @@
 import request from "./request";
 
 // 员工数据类型定义
+// 对应后端的EmployeeVO
 export interface Employee {
   id: string;
   username: string;
   name: string;
-  password: string;
   phone: string;
   sex: string; // "1" 或 "0"
   idNumber: string;
   status: number;
-  createTime: string;
   updateTime: string;
-  createUser: string;
-  updateUser: string;
 }
 
 // 分页查询请求参数
@@ -34,7 +31,7 @@ export interface EmployeePageResponse {
  * @param params 查询参数
  * @returns 分页数据
  */
-export const getEmployeeList = async (
+export const getEmployeeListAPI = async (
   params: EmployeePageQuery
 ): Promise<EmployeePageResponse> => {
   // GET 请求，将参数作为 query string
@@ -54,7 +51,7 @@ export const getEmployeeList = async (
  * @param employeeId 员工ID
  * @returns 操作结果
  */
-export const enableOrDisableEmployee = async (
+export const enableOrDisableEmployeeAPI = async (
   status: number,
   employeeId: string
 ): Promise<void> => {
@@ -63,7 +60,7 @@ export const enableOrDisableEmployee = async (
 
 // 员工表单数据类型
 export interface EmployeeFormData {
-  id?: string;
+  id: string;
   username: string;
   name: string;
   phone: string;
@@ -76,7 +73,7 @@ export interface EmployeeFormData {
  * @param id 员工ID
  * @returns 员工信息
  */
-export const getEmployeeById = async (id: string): Promise<Employee> => {
+export const getEmployeeByIdAPI = async (id: string): Promise<Employee> => {
   return request.get(`/employee/${id}`);
 };
 
@@ -85,7 +82,7 @@ export const getEmployeeById = async (id: string): Promise<Employee> => {
  * @param data 员工表单数据
  * @returns 操作结果
  */
-export const saveEmployee = async (data: EmployeeFormData): Promise<string> => {
+export const saveEmployeeAPI = async (data: EmployeeFormData): Promise<string> => {
   return request.post("/employee", data);
 };
 
@@ -94,7 +91,7 @@ export const saveEmployee = async (data: EmployeeFormData): Promise<string> => {
  * @param data 员工表单数据
  * @returns 操作结果
  */
-export const updateEmployee = async (data: EmployeeFormData): Promise<void> => {
+export const updateEmployeeAPI = async (data: EmployeeFormData): Promise<void> => {
   return request.put("/employee", data);
 };
 

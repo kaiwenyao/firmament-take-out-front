@@ -1,4 +1,3 @@
-import React from 'react'
 import ReactDOM from 'react-dom/client'
 import { RouterProvider } from 'react-router-dom' // 1. 引入 Provider
 import router from './router' // 2. 引入你刚才写的 router 配置

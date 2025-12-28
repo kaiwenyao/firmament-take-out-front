@@ -43,7 +43,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
     setStatusLoading(true);
     try {
       const status = await getShopStatus();
-      setShopStatusState(status ?? 1); // 如果返回 null，默认为营业中
+      setShopStatusState(status);
     } catch (error) {
       console.error("获取店铺营业状态失败:", error);
       // 失败时默认为营业中
@@ -59,15 +59,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   }, []);
 
   const handleLogout = async () => {
-    try {
-      await employeeLogout();
-      toast.success("已退出登录");
-      navigate("/login", { replace: true });
-    } catch (error) {
-      // 即使出错也清除本地数据并跳转
-      toast.error("退出登录失败");
-      navigate("/login", { replace: true });
-    }
+    await employeeLogout();
+    toast.success("已退出登录");
+    navigate("/login", { replace: true });
   };
 
   // 处理设置营业状态
@@ -80,7 +74,9 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
       toast.success(`已设置为${status === 1 ? "营业中" : "打烊中"}`);
     } catch (error) {
       console.error("设置店铺营业状态失败:", error);
-      toast.error("设置营业状态失败，请稍后重试");
+      toast.error("设置营业状态失败", {
+        description: (error as Error).message, // 把具体错误放在这里
+      });
     } finally {
       setLoading(false);
     }

@@ -113,9 +113,7 @@ export default function Category() {
   const [loading, setLoading] = useState(false); // 加载状态
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false); // 确认对话框状态（启用/禁用）
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false); // 删除确认对话框状态
-  const [errorDialogOpen, setErrorDialogOpen] = useState(false); // 错误对话框状态
   const [currentCategory, setCurrentCategory] = useState<Category | null>(null); // 当前操作的分类
-  const [errorMessage, setErrorMessage] = useState(""); // 错误信息
   const [formDialogOpen, setFormDialogOpen] = useState(false); // 表单对话框状态
   const [isEditMode, setIsEditMode] = useState(false); // 是否为编辑模式
   const [formType, setFormType] = useState<number>(1); // 表单类型：1-菜品分类，2-套餐分类
@@ -141,8 +139,9 @@ export default function Category() {
       setTotal(Number(res.total));
     } catch (error) {
       console.error("获取分类列表失败:", error);
-      setErrorMessage(getErrorMessage(error) || "获取分类列表失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("获取分类列表失败", {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     } finally {
       setLoading(false);
     }
@@ -194,8 +193,9 @@ export default function Category() {
     } catch (error) {
       console.error(`${action}分类失败:`, error);
       setConfirmDialogOpen(false);
-      setErrorMessage(getErrorMessage(error) || `${action}分类失败，请稍后重试`);
-      setErrorDialogOpen(true);
+      toast.error(`${action}分类失败`, {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     }
   };
 
@@ -291,8 +291,9 @@ export default function Category() {
     } catch (error) {
       console.error("删除分类失败:", error);
       setDeleteDialogOpen(false);
-      setErrorMessage(getErrorMessage(error) || "删除分类失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("删除分类失败", {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     }
   };
 
@@ -308,8 +309,9 @@ export default function Category() {
     // 检查是否有错误
     const hasErrors = Object.values(errors).some((error) => error !== "");
     if (hasErrors) {
-      setErrorMessage("请检查表单信息，确保所有字段填写正确");
-      setErrorDialogOpen(true);
+      toast.error("表单校验失败", {
+        description: "请检查表单信息，确保所有字段填写正确"
+      });
       return;
     }
 
@@ -348,8 +350,9 @@ export default function Category() {
       }
     } catch (error) {
       console.error(`${isEditMode ? "修改" : "新增"}分类失败:`, error);
-      setErrorMessage(getErrorMessage(error) || `${isEditMode ? "修改" : "新增"}分类失败，请稍后重试`);
-      setErrorDialogOpen(true);
+      toast.error(`${isEditMode ? "修改" : "新增"}分类失败`, {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     } finally {
       setFormLoading(false);
     }
@@ -721,21 +724,6 @@ export default function Category() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               确认
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 错误提示对话框 */}
-      <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>操作失败</AlertDialogTitle>
-            <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorDialogOpen(false)}>
-              确定
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

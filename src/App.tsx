@@ -1,10 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { Outlet } from "react-router-dom";
+import { Outlet, useNavigate } from "react-router-dom";
 import Header from "@/components/Header";
 import Sidebar from "@/components/Sidebar";
 import { Toaster } from "@/components/ui/sonner";
 import { useWebSocket } from "./hooks/useWebSocket";
 import { toast } from "sonner";
+import { setNavigate } from "@/utils/navigation";
+// import { useMemo } from "react";
 
 // ✅ 1. 关键修改：通过 import 引入资源，而不是写死字符串路径
 // Vite 会自动处理这些文件的最终 hash 路径
@@ -12,107 +14,112 @@ import previewSound from "@/assets/audio/preview.mp3";
 import reminderSound from "@/assets/audio/reminder.mp3";
 
 function App() {
+  const navigate = useNavigate();
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  
-  // 生成客户端ID
+
+  // 初始化 navigate 函数，供非组件环境使用
+  useEffect(() => {
+    setNavigate(navigate);
+  }, [navigate]);
+
+  /**
+   * 生成客户端ID（用于 WebSocket 连接标识）
+   *
+   * 为什么使用函数初始化（惰性初始化）？
+   * 1. React 机制：useState 的初始化函数只在组件首次挂载时执行一次
+   *    后续的重渲染（state 更新、父组件重渲染等）不会再次执行这个函数
+   *
+   * 2. 性能优化：
+   *    - 避免每次重渲染都读取 localStorage（I/O 操作）
+   *    - 避免每次重渲染都生成新的随机 ID（保证 ID 一致性）
+   *    - 减少不必要的计算开销
+   *
+   * 3. 数据一致性：
+   *    - 确保整个组件生命周期内使用同一个客户端 ID
+   *    - 如果使用普通值初始化，每次重渲染都可能生成不同的 ID（错误！）
+   *
+   * 4. 实际执行流程：
+   *    - 首次渲染：执行函数 → 读取 localStorage → 不存在则生成并保存 → 返回 ID
+   *    - 后续渲染：直接使用已保存的状态值，不再执行函数
+   */
   const [sid] = useState<string>(() => {
     const STORAGE_KEY = "ws_client_id";
     let storedId = localStorage.getItem(STORAGE_KEY);
     if (!storedId) {
-      storedId = `client_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+      storedId = `client_${Date.now()}_${Math.random()
+        .toString(36)
+        .substring(2, 11)}`;
       localStorage.setItem(STORAGE_KEY, storedId);
     }
     return storedId;
   });
 
+  // ✅ 1. 使用 useRef 存放音频对象 (这是存放 Mutable 可变对象的标准方式，不会报错)
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const reminderAudioRef = useRef<HTMLAudioElement | null>(null);
-  // 使用 ref 来追踪是否已初始化，避免 StrictMode 下的双重执行问题
-  const isAudioInitialized = useRef(false);
 
+  // ✅ 2. 简单的初始化 (只执行一次)
   useEffect(() => {
-    if (isAudioInitialized.current) return;
-
-    // ✅ 2. 使用导入的变量创建 Audio 对象
-    previewAudioRef.current = new Audio(previewSound);
-    reminderAudioRef.current = new Audio(reminderSound);
-    
-    // 标记初始化完成
-    isAudioInitialized.current = true;
-
-    const previewAudio = previewAudioRef.current;
-    const reminderAudio = reminderAudioRef.current;
-    
-    // 尝试解锁音频播放 (浏览器自动播放策略)
-    const unlockAudio = () => {
-      // 这里的逻辑稍微简化，只需要尝试播放并捕获错误即可
-      // 实际上只要用户有过交互，后续的 playAudio 就能成功
-      previewAudio.load();
-      reminderAudio.load();
-      
-      // 移除监听器，只需触发一次
-      ["click", "touchstart", "keydown"].forEach((event) => {
-        document.removeEventListener(event, unlockAudio);
-      });
-    };
-
-    // 监听用户交互
-    ["click", "touchstart", "keydown"].forEach((event) => {
-      document.addEventListener(event, unlockAudio);
-    });
-
-    return () => {
-      ["click", "touchstart", "keydown"].forEach((event) => {
-        document.removeEventListener(event, unlockAudio);
-      });
-    };
+    // 只有当 ref 为空时才创建，避免重复
+    if (!previewAudioRef.current) {
+      previewAudioRef.current = new Audio(previewSound);
+    }
+    if (!reminderAudioRef.current) {
+      reminderAudioRef.current = new Audio(reminderSound);
+    }
   }, []);
 
-  // ✅ 3. 使用 useCallback 包裹，保证函数引用稳定
-  const playAudio = useCallback(async (type: 'preview' | 'reminder') => {
-    const audio = type === 'preview' ? previewAudioRef.current : reminderAudioRef.current;
+  // ✅ 3. 播放逻辑
+  const playAudio = useCallback(async (type: "preview" | "reminder") => {
+    // 从 ref.current 中取出音频对象
+    const audio =
+      type === "preview" ? previewAudioRef.current : reminderAudioRef.current;
+
+    // 安全检查：如果万一没初始化好，直接返回
     if (!audio) return;
-    
+
     try {
+      // ✅ 这里修改 currentTime 不会报错，因为 ref 里的对象允许修改
       audio.currentTime = 0;
       await audio.play();
       console.log(`播放 ${type} 音频成功`);
     } catch (err) {
-      console.error(`播放 ${type} 音频被浏览器拦截或失败:`, err);
-      // 如果是因为没有交互导致的失败，这里提示用户点击
+      console.warn("音频播放失败:", err);
       toast.error("提示音播放失败，请点击页面任意位置以启用音频");
     }
   }, []);
 
-  // ✅ 4. 回调函数也需要稳定，避免 useWebSocket 内部产生不必要的重连
-  const handleMessage = useCallback((message: string) => {
+  // ✅ 4. 消息处理
+  const handleMessage = useCallback(
+    (message: string) => {
       try {
         const data = JSON.parse(message);
         console.log("WebSocket收到消息:", data);
-        
+
         if (data.type === 1) {
-          toast.success("您有新的外卖订单，请及时处理"); // 使用 success 样式
-          playAudio('preview');
+          toast.success("您有新的外卖订单，请及时处理");
+          playAudio("preview");
         } else if (data.type === 2) {
-          const content = "客户催单，请尽快处理!" + data.content;
-          toast.warning(content); // 使用 warning 样式
-          playAudio('reminder');
+          toast.warning("客户催单，请尽快处理!" + (data.content || ""));
+          playAudio("reminder");
         }
       } catch (e) {
         console.error("JSON解析失败", e);
       }
-  }, [playAudio]); // 依赖 playAudio
+    },
+    [playAudio]
+  );
 
   // WebSocket 连接
   useWebSocket({
     sid,
-    onMessage: handleMessage, // 传入稳定的函数
+    onMessage: handleMessage,
   });
-
+  
   return (
     <>
       <div className="flex flex-col h-screen w-full bg-gray-50">
-        <Header 
+        <Header
           onToggleSidebar={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         />
         <div className="flex flex-1 overflow-hidden">

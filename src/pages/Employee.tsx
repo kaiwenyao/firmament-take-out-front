@@ -49,13 +49,14 @@ import {
   PaginationPrevious,
 } from "@/components/ui/pagination";
 import {
-  getEmployeeList,
-  enableOrDisableEmployee,
-  getEmployeeById,
-  saveEmployee,
-  updateEmployee,
+  getEmployeeListAPI,
+  enableOrDisableEmployeeAPI,
+  getEmployeeByIdAPI,
+  saveEmployeeAPI,
+  updateEmployeeAPI,
   type Employee,
   type EmployeeFormData,
+  type EmployeePageQuery,
 } from "@/api/employee";
 import { toast } from "sonner";
 
@@ -65,10 +66,12 @@ const getErrorMessage = (error: unknown): string => {
   if (typeof error === "string") {
     return error;
   }
-  
+
   // 如果是 Error 对象，检查是否有 response
   if (error && typeof error === "object" && "response" in error) {
-    const axiosError = error as { response?: { data?: { msg?: string }; status?: number } };
+    const axiosError = error as {
+      response?: { data?: { msg?: string }; status?: number };
+    };
     // 后端返回的错误格式：{ code: 0, msg: "错误信息" }
     if (axiosError.response?.data?.msg) {
       return axiosError.response.data.msg;
@@ -78,7 +81,7 @@ const getErrorMessage = (error: unknown): string => {
       return `请求失败 (${axiosError.response.status})`;
     }
   }
-  
+
   // 如果是 Error 对象，返回 message
   if (error && typeof error === "object" && "message" in error) {
     const err = error as { message?: string };
@@ -86,27 +89,28 @@ const getErrorMessage = (error: unknown): string => {
       return err.message;
     }
   }
-  
+
   // 默认错误信息
   return "操作失败，请稍后重试";
 };
 
 export default function Employee() {
-  
   // 定义状态
   const [list, setList] = useState<Employee[]>([]);
   const [name, setName] = useState(""); // 搜索框绑定的值
-  const [page, setPage] = useState(1); // 当前页码
-  const [pageSize, setPageSize] = useState(10); // 每页条数
   const [total, setTotal] = useState(0); // 总条数
   const [loading, setLoading] = useState(false); // 加载状态
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false); // 确认对话框状态
-  const [errorDialogOpen, setErrorDialogOpen] = useState(false); // 错误对话框状态
   const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null); // 当前操作的员工
-  const [errorMessage, setErrorMessage] = useState(""); // 错误信息
   const [formDialogOpen, setFormDialogOpen] = useState(false); // 表单对话框状态
   const [isEditMode, setIsEditMode] = useState(false); // 是否为编辑模式
+  const [reqData, setReqData] = useState<EmployeePageQuery>({
+    page: 1,
+    pageSize: 10,
+    name: undefined, // 初始没有搜索词
+  });
   const [formData, setFormData] = useState<EmployeeFormData>({
+    id: "",
     username: "",
     name: "",
     phone: "",
@@ -116,47 +120,60 @@ export default function Employee() {
   const [formLoading, setFormLoading] = useState(false); // 表单提交加载状态
   const [formErrors, setFormErrors] = useState<Record<string, string>>({}); // 表单错误信息
 
-  // 获取数据的函数
-  const fetchData = async () => {
-    setLoading(true);
-    try {
-      const res = await getEmployeeList({
-        page,
-        pageSize,
-        name: name || undefined, // 如果为空字符串，传 undefined
-      });
-      setList(res.records);
-      setTotal(Number(res.total));
-    } catch (error) {
-      console.error("获取员工列表失败:", error);
-      setErrorMessage(getErrorMessage(error) || "获取员工列表失败，请稍后重试");
-      setErrorDialogOpen(true);
-    } finally {
-      setLoading(false);
-    }
+  useEffect(() => {
+    // 定义在内部，无需 useCallback
+    const fetchData = async () => {
+      setLoading(true);
+      try {
+        console.log("发起请求，参数:", reqData);
+        const res = await getEmployeeListAPI({
+          ...reqData, // 1. 先把 page, pageSize 自动解构进去
+          // 2. 手动覆盖 name 属性，保留你的"判空"逻辑
+          name: reqData.name || undefined,
+        });
+        setList(res.records);
+        setTotal(Number(res.total));
+      } catch (error) {
+        console.error(error);
+        toast.error("获取员工列表失败");
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+    // 🔥 核心魔法：只依赖 reqData
+    // 因为 reqData 是对象，每次 setReqData({...reqData}) 都会生成新地址
+    // React 比较：旧对象地址 !== 新对象地址 -> 触发！
+  }, [reqData]);
+
+  const reloadData = () => {
+    // 复制一份自己，内容一样，但内存地址变了
+    setReqData((prev) => ({ ...prev }));
   };
 
-  // 页面加载时自动触发一次
-  useEffect(() => {
-    fetchData();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, pageSize]); // 当页码或每页条数变化时重新获取数据
-
-  // 搜索功能
   const handleSearch = () => {
-    setPage(1); // 搜索时重置到第一页
-    fetchData();
+    setReqData((prev) => ({
+      ...prev, // 保留 pageSize 等其他参数
+      page: 1, // 搜索新词，回到第一页
+      name: name, // 把输入框的值“提交”进 reqData
+    }));
   };
 
   // 分页处理
   const handlePageChange = (newPage: number) => {
-    setPage(newPage);
+    setReqData((prev) => ({
+      ...prev,
+      page: newPage,
+    }));
   };
 
   // 每页条数变化处理
   const handlePageSizeChange = (newPageSize: string) => {
-    setPageSize(Number(newPageSize));
-    setPage(1); // 重置到第一页
+    setReqData((prev) => ({
+      ...prev,
+      pageSize: Number(newPageSize),
+      page: 1, // 重置到第一页
+    }));
   };
 
   // 打开确认对话框
@@ -173,17 +190,18 @@ export default function Employee() {
     const action = newStatus === 1 ? "启用" : "禁用";
 
     try {
-      await enableOrDisableEmployee(newStatus, currentEmployee.id);
+      await enableOrDisableEmployeeAPI(newStatus, currentEmployee.id);
       setConfirmDialogOpen(false);
       setCurrentEmployee(null);
       toast.success(`${action}员工账号成功`);
       // 操作成功后刷新列表
-      fetchData();
+      reloadData();
     } catch (error) {
       console.error(`${action}员工账号失败:`, error);
       setConfirmDialogOpen(false);
-      setErrorMessage(getErrorMessage(error) || `${action}员工账号失败，请稍后重试`);
-      setErrorDialogOpen(true);
+      toast.error(`${action}员工账号失败`, {
+        description: getErrorMessage(error) || "请稍后重试",
+      });
     }
   };
 
@@ -191,6 +209,7 @@ export default function Employee() {
   const handleOpenAddForm = () => {
     setIsEditMode(false);
     setFormData({
+      id: "",
       username: "",
       name: "",
       phone: "",
@@ -206,7 +225,7 @@ export default function Employee() {
     setIsEditMode(true);
     setFormLoading(true);
     try {
-      const employeeDetail = await getEmployeeById(employee.id);
+      const employeeDetail = await getEmployeeByIdAPI(employee.id);
       setFormData({
         id: employeeDetail.id,
         username: employeeDetail.username,
@@ -219,8 +238,9 @@ export default function Employee() {
       setFormDialogOpen(true);
     } catch (error) {
       console.error("获取员工详情失败:", error);
-      setErrorMessage(getErrorMessage(error) || "获取员工详情失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("获取员工详情失败", {
+        description: getErrorMessage(error) || "请稍后重试",
+      });
     } finally {
       setFormLoading(false);
     }
@@ -254,7 +274,11 @@ export default function Employee() {
         if (!value.trim()) {
           return "身份证号不能为空";
         }
-        if (!/^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(value.trim())) {
+        if (
+          !/^[1-9]\d{5}(18|19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dXx]$/.test(
+            value.trim()
+          )
+        ) {
           return "请输入正确的身份证号";
         }
         return "";
@@ -286,8 +310,9 @@ export default function Employee() {
     // 检查是否有错误
     const hasErrors = Object.values(errors).some((error) => error !== "");
     if (hasErrors) {
-      setErrorMessage("请检查表单信息，确保所有字段填写正确");
-      setErrorDialogOpen(true);
+      toast.error("表单校验失败", {
+        description: "请检查表单信息，确保所有字段填写正确",
+      });
       return;
     }
 
@@ -295,27 +320,28 @@ export default function Employee() {
     try {
       if (isEditMode) {
         // 修改员工
-        await updateEmployee(formData);
+        await updateEmployeeAPI(formData);
         toast.success("修改员工成功");
       } else {
         // 添加员工
-        await saveEmployee(formData);
+        await saveEmployeeAPI(formData);
         toast.success("添加员工成功");
       }
       setFormDialogOpen(false);
       // 操作成功后刷新列表
-      fetchData();
+      reloadData();
     } catch (error) {
       console.error(`${isEditMode ? "修改" : "添加"}员工失败:`, error);
-      setErrorMessage(getErrorMessage(error) || `${isEditMode ? "修改" : "添加"}员工失败，请稍后重试`);
-      setErrorDialogOpen(true);
+      toast.error(`${isEditMode ? "修改" : "添加"}员工失败`, {
+        description: getErrorMessage(error) || "请稍后重试",
+      });
     } finally {
       setFormLoading(false);
     }
   };
 
   // 计算总页数
-  const totalPages = Math.ceil(total / pageSize);
+  const totalPages = Math.ceil(total / reqData.pageSize);
   return (
     <div className="h-full flex flex-col gap-3">
       {/* 顶部操作栏 */}
@@ -323,7 +349,10 @@ export default function Employee() {
         {/* 左侧：搜索区域 */}
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-2">
-            <Label htmlFor="employee-name" className="whitespace-nowrap text-sm">
+            <Label
+              htmlFor="employee-name"
+              className="whitespace-nowrap text-sm"
+            >
               员工姓名：
             </Label>
             <Input
@@ -368,181 +397,216 @@ export default function Employee() {
               <Skeleton className="h-10 w-full" />
             </div>
           ) : (
-          <>
-            {/* 表格 */}
-            <div className="flex-1 overflow-auto rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50 hover:bg-muted/50">
-                    <TableHead className="font-semibold">员工姓名</TableHead>
-                    <TableHead className="font-semibold">账号</TableHead>
-                    <TableHead className="font-semibold">手机号</TableHead>
-                    <TableHead className="font-semibold">账号状态</TableHead>
-                    <TableHead className="font-semibold">最后操作时间</TableHead>
-                    <TableHead className="font-semibold">操作</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {list.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={6} className="text-center py-12">
-                        <div className="text-muted-foreground">暂无数据</div>
-                      </TableCell>
+            <>
+              {/* 表格 */}
+              <div className="flex-1 overflow-auto rounded-md border">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-muted/50 hover:bg-muted/50">
+                      <TableHead className="font-semibold">员工姓名</TableHead>
+                      <TableHead className="font-semibold">账号</TableHead>
+                      <TableHead className="font-semibold">手机号</TableHead>
+                      <TableHead className="font-semibold">账号状态</TableHead>
+                      <TableHead className="font-semibold">
+                        最后操作时间
+                      </TableHead>
+                      <TableHead className="font-semibold">操作</TableHead>
                     </TableRow>
-                  ) : (
-                    list.map((item) => (
-                      <TableRow key={item.id} className="hover:bg-muted/30 transition-colors">
-                        <TableCell className="font-medium">{item.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{item.username}</TableCell>
-                        <TableCell>{item.phone}</TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <div
-                              className={`h-2 w-2 rounded-full ${
-                                item.status === 1 ? "bg-green-500" : "bg-gray-400"
-                              }`}
-                            />
-                            <span className="text-sm font-medium">
-                              {item.status === 1 ? "启用" : "禁用"}
-                            </span>
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {item.updateTime || item.createTime}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center gap-2">
-                            <button
-                              onClick={() => handleOpenEditForm(item)}
-                              className="text-primary hover:text-primary/80 hover:underline text-sm font-medium cursor-pointer transition-colors"
-                            >
-                              修改
-                            </button>
-                            <Separator orientation="vertical" className="h-4" />
-                            <button
-                              onClick={() => handleOpenConfirmDialog(item)}
-                              className={`${
-                                item.status === 1
-                                  ? "text-destructive hover:text-destructive/80"
-                                  : "text-green-600 hover:text-green-700"
-                              } hover:underline text-sm font-medium cursor-pointer transition-colors`}
-                            >
-                              {item.status === 1 ? "禁用" : "启用"}
-                            </button>
-                          </div>
+                  </TableHeader>
+                  <TableBody>
+                    {list.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-12">
+                          <div className="text-muted-foreground">暂无数据</div>
                         </TableCell>
                       </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-
-            {/* 分页组件 */}
-            {total > 0 && (
-              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                <div className="flex items-center gap-4 flex-shrink-0 min-w-fit">
-                  <div className="text-sm text-muted-foreground whitespace-nowrap">
-                    共 {total} 条记录，第 {page} / {totalPages} 页
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Label htmlFor="page-size" className="text-sm whitespace-nowrap">
-                      每页显示：
-                    </Label>
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          id="page-size"
-                          className="w-[100px] justify-between"
+                    ) : (
+                      list.map((item) => (
+                        <TableRow
+                          key={item.id}
+                          className="hover:bg-muted/30 transition-colors"
                         >
-                          {pageSize}
-                          <ChevronDown className="h-4 w-4 opacity-50" />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="start">
-                        <DropdownMenuItem onClick={() => handlePageSizeChange("5")}>
-                          5
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePageSizeChange("10")}>
-                          10
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePageSizeChange("15")}>
-                          15
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handlePageSizeChange("30")}>
-                          30
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </div>
-                </div>
-                <Pagination>
-                  <PaginationContent>
-                    <PaginationItem>
-                      <PaginationPrevious
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (page > 1) handlePageChange(page - 1);
-                        }}
-                        className={page === 1 ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
-                    {Array.from({ length: totalPages }, (_, i) => i + 1)
-                      .filter((p) => {
-                        return (
-                          p === 1 ||
-                          p === totalPages ||
-                          (p >= page - 1 && p <= page + 1)
-                        );
-                      })
-                      .map((p, index, array) => {
-                        const prev = array[index - 1];
-                        const showEllipsis = prev && p - prev > 1;
-                        return (
-                          <Fragment key={p}>
-                            {showEllipsis && (
-                              <PaginationItem>
-                                <PaginationEllipsis />
-                              </PaginationItem>
-                            )}
-                            <PaginationItem>
-                              <PaginationLink
-                                href="#"
-                                onClick={(e) => {
-                                  e.preventDefault();
-                                  handlePageChange(p);
-                                }}
-                                isActive={p === page}
-                                className={
-                                  p === page
-                                    ? "bg-[#ffc200] text-black hover:bg-[#ffc200]/90"
-                                    : ""
-                                }
+                          <TableCell className="font-medium">
+                            {item.name}
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {item.username}
+                          </TableCell>
+                          <TableCell>{item.phone}</TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div
+                                className={`h-2 w-2 rounded-full ${
+                                  item.status === 1
+                                    ? "bg-green-500"
+                                    : "bg-gray-400"
+                                }`}
+                              />
+                              <span className="text-sm font-medium">
+                                {item.status === 1 ? "启用" : "禁用"}
+                              </span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">
+                            {item.updateTime}
+                          </TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleOpenEditForm(item)}
+                                className="text-primary hover:text-primary/80 hover:underline text-sm font-medium cursor-pointer transition-colors"
                               >
-                                {p}
-                              </PaginationLink>
-                            </PaginationItem>
-                          </Fragment>
-                        );
-                      })}
-                    <PaginationItem>
-                      <PaginationNext
-                        href="#"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          if (page < totalPages) handlePageChange(page + 1);
-                        }}
-                        className={page === totalPages ? "pointer-events-none opacity-50" : ""}
-                      />
-                    </PaginationItem>
-                  </PaginationContent>
-                </Pagination>
+                                修改
+                              </button>
+                              <Separator
+                                orientation="vertical"
+                                className="h-4"
+                              />
+                              <button
+                                onClick={() => handleOpenConfirmDialog(item)}
+                                className={`${
+                                  item.status === 1
+                                    ? "text-destructive hover:text-destructive/80"
+                                    : "text-green-600 hover:text-green-700"
+                                } hover:underline text-sm font-medium cursor-pointer transition-colors`}
+                              >
+                                {item.status === 1 ? "禁用" : "启用"}
+                              </button>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
               </div>
-            )}
-          </>
+
+              {/* 分页组件 */}
+              {total > 0 && (
+                <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                  <div className="flex items-center gap-4 flex-shrink-0 min-w-fit">
+                    <div className="text-sm text-muted-foreground whitespace-nowrap">
+                      共 {total} 条记录，第 {reqData.page} / {totalPages} 页
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label
+                        htmlFor="page-size"
+                        className="text-sm whitespace-nowrap"
+                      >
+                        每页显示：
+                      </Label>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            id="page-size"
+                            className="w-[100px] justify-between"
+                          >
+                            {reqData.pageSize}
+                            <ChevronDown className="h-4 w-4 opacity-50" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="start">
+                          <DropdownMenuItem
+                            onClick={() => handlePageSizeChange("5")}
+                          >
+                            5
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handlePageSizeChange("10")}
+                          >
+                            10
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handlePageSizeChange("15")}
+                          >
+                            15
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={() => handlePageSizeChange("30")}
+                          >
+                            30
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
+                    </div>
+                  </div>
+                  <Pagination>
+                    <PaginationContent>
+                      <PaginationItem>
+                        <PaginationPrevious
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (reqData.page > 1)
+                              handlePageChange(reqData.page - 1);
+                          }}
+                          className={
+                            reqData.page === 1
+                              ? "pointer-events-none opacity-50"
+                              : ""
+                          }
+                        />
+                      </PaginationItem>
+                      {Array.from({ length: totalPages }, (_, i) => i + 1)
+                        .filter((p) => {
+                          return (
+                            p === 1 ||
+                            p === totalPages ||
+                            (p >= reqData.page - 1 && p <= reqData.page + 1)
+                          );
+                        })
+                        .map((p, index, array) => {
+                          const prev = array[index - 1];
+                          const showEllipsis = prev && p - prev > 1;
+                          return (
+                            <Fragment key={p}>
+                              {showEllipsis && (
+                                <PaginationItem>
+                                  <PaginationEllipsis />
+                                </PaginationItem>
+                              )}
+                              <PaginationItem>
+                                <PaginationLink
+                                  href="#"
+                                  onClick={(e) => {
+                                    e.preventDefault();
+                                    handlePageChange(p);
+                                  }}
+                                  isActive={p === reqData.page}
+                                  className={
+                                    p === reqData.page
+                                      ? "bg-[#ffc200] text-black hover:bg-[#ffc200]/90"
+                                      : ""
+                                  }
+                                >
+                                  {p}
+                                </PaginationLink>
+                              </PaginationItem>
+                            </Fragment>
+                          );
+                        })}
+                      <PaginationItem>
+                        <PaginationNext
+                          href="#"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (reqData.page < totalPages)
+                              handlePageChange(reqData.page + 1);
+                          }}
+                          className={
+                            reqData.page === totalPages
+                              ? "pointer-events-none opacity-50"
+                              : ""
+                          }
+                        />
+                      </PaginationItem>
+                    </PaginationContent>
+                  </Pagination>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
@@ -561,7 +625,9 @@ export default function Employee() {
                   ) : (
                     <span className="text-green-600 font-semibold">启用</span>
                   )}
-                  员工"<span className="font-semibold">{currentEmployee.name}</span>"的账号吗？
+                  员工"
+                  <span className="font-semibold">{currentEmployee.name}</span>
+                  "的账号吗？
                 </>
               )}
             </AlertDialogDescription>
@@ -577,21 +643,6 @@ export default function Employee() {
               }
             >
               确认
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 错误提示对话框 */}
-      <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>操作失败</AlertDialogTitle>
-            <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorDialogOpen(false)}>
-              确定
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -625,7 +676,9 @@ export default function Employee() {
                 className={formErrors.username ? "border-destructive" : ""}
               />
               {formErrors.username && (
-                <p className="text-sm text-destructive">{formErrors.username}</p>
+                <p className="text-sm text-destructive">
+                  {formErrors.username}
+                </p>
               )}
             </div>
             <div className="grid gap-2">
@@ -709,7 +762,9 @@ export default function Employee() {
                 className={formErrors.idNumber ? "border-destructive" : ""}
               />
               {formErrors.idNumber && (
-                <p className="text-sm text-destructive">{formErrors.idNumber}</p>
+                <p className="text-sm text-destructive">
+                  {formErrors.idNumber}
+                </p>
               )}
             </div>
           </div>

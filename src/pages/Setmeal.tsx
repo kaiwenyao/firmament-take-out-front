@@ -104,9 +104,7 @@ export default function Setmeal() {
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false); // 确认对话框状态（启用/禁用）
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false); // 删除确认对话框状态
   const [batchDeleteDialogOpen, setBatchDeleteDialogOpen] = useState(false); // 批量删除确认对话框
-  const [errorDialogOpen, setErrorDialogOpen] = useState(false); // 错误对话框状态
   const [currentSetmeal, setCurrentSetmeal] = useState<Setmeal | null>(null); // 当前操作的套餐
-  const [errorMessage, setErrorMessage] = useState(""); // 错误信息
   const [formDialogOpen, setFormDialogOpen] = useState(false); // 表单对话框状态
   const [isEditMode, setIsEditMode] = useState(false); // 是否为编辑模式
   const [formData, setFormData] = useState<SetmealFormData>({
@@ -151,8 +149,9 @@ export default function Setmeal() {
       setSelectedIds([]);
     } catch (error) {
       console.error("获取套餐列表失败:", error);
-      setErrorMessage(getErrorMessage(error) || "获取套餐列表失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("获取套餐列表失败", {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     } finally {
       setLoading(false);
     }
@@ -223,8 +222,9 @@ export default function Setmeal() {
     } catch (error) {
       console.error(`${action}套餐失败:`, error);
       setConfirmDialogOpen(false);
-      setErrorMessage(getErrorMessage(error) || `${action}套餐失败，请稍后重试`);
-      setErrorDialogOpen(true);
+      toast.error(`${action}套餐失败`, {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     }
   };
 
@@ -248,16 +248,18 @@ export default function Setmeal() {
     } catch (error) {
       console.error("删除套餐失败:", error);
       setDeleteDialogOpen(false);
-      setErrorMessage(getErrorMessage(error) || "删除套餐失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("删除套餐失败", {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     }
   };
 
   // 打开批量删除确认对话框
   const handleBatchDelete = () => {
     if (selectedIds.length === 0) {
-      setErrorMessage("请至少选择一个套餐");
-      setErrorDialogOpen(true);
+      toast.error("批量删除失败", {
+        description: "请至少选择一个套餐"
+      });
       return;
     }
     setBatchDeleteDialogOpen(true);
@@ -275,8 +277,9 @@ export default function Setmeal() {
     } catch (error) {
       console.error("批量删除套餐失败:", error);
       setBatchDeleteDialogOpen(false);
-      setErrorMessage(getErrorMessage(error) || "批量删除套餐失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("批量删除套餐失败", {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     }
   };
 
@@ -362,8 +365,9 @@ export default function Setmeal() {
       setFormDialogOpen(true);
     } catch (error) {
       console.error("获取套餐详情失败:", error);
-      setErrorMessage(getErrorMessage(error) || "获取套餐详情失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("获取套餐详情失败", {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     } finally {
       setFormLoading(false);
     }
@@ -377,15 +381,17 @@ export default function Setmeal() {
     // 验证文件类型
     const validTypes = ["image/png", "image/jpeg", "image/jpg"];
     if (!validTypes.includes(file.type)) {
-      setErrorMessage("仅能上传PNG、JPEG、JPG类型图片");
-      setErrorDialogOpen(true);
+      toast.error("图片格式错误", {
+        description: "仅能上传PNG、JPEG、JPG类型图片"
+      });
       return;
     }
 
     // 验证文件大小（10MB）
     if (file.size > 10 * 1024 * 1024) {
-      setErrorMessage("图片大小不超过10M");
-      setErrorDialogOpen(true);
+      toast.error("图片大小超限", {
+        description: "图片大小不超过10M"
+      });
       return;
     }
 
@@ -399,8 +405,9 @@ export default function Setmeal() {
       }
     } catch (error) {
       console.error("图片上传失败:", error);
-      setErrorMessage(getErrorMessage(error) || "图片上传失败，请稍后重试");
-      setErrorDialogOpen(true);
+      toast.error("图片上传失败", {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     } finally {
       setImageUploading(false);
     }
@@ -420,8 +427,9 @@ export default function Setmeal() {
     // 检查是否有错误
     const hasErrors = Object.values(errors).some((error) => error !== "");
     if (hasErrors) {
-      setErrorMessage("请检查表单信息，确保所有必填字段填写正确");
-      setErrorDialogOpen(true);
+      toast.error("表单校验失败", {
+        description: "请检查表单信息，确保所有必填字段填写正确"
+      });
       return;
     }
 
@@ -452,8 +460,9 @@ export default function Setmeal() {
       fetchData();
     } catch (error) {
       console.error(`${isEditMode ? "修改" : "新增"}套餐失败:`, error);
-      setErrorMessage(getErrorMessage(error) || `${isEditMode ? "修改" : "新增"}套餐失败，请稍后重试`);
-      setErrorDialogOpen(true);
+      toast.error(`${isEditMode ? "修改" : "新增"}套餐失败`, {
+        description: getErrorMessage(error) || "请稍后重试"
+      });
     } finally {
       setFormLoading(false);
     }
@@ -928,21 +937,6 @@ export default function Setmeal() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               确认
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 错误提示对话框 */}
-      <AlertDialog open={errorDialogOpen} onOpenChange={setErrorDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>操作失败</AlertDialogTitle>
-            <AlertDialogDescription>{errorMessage}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogAction onClick={() => setErrorDialogOpen(false)}>
-              确定
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
