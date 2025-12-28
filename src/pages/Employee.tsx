@@ -208,6 +208,13 @@ export default function Employee() {
   // 打开添加员工表单
   const handleOpenAddForm = () => {
     setIsEditMode(false);
+    setFormErrors({});
+    setFormDialogOpen(true);
+
+    // 🤔 思考：添加表单是纯前端操作，不需要去后端拿数据
+    // 所以根本不需要设置 Loading，也不需要 setTimeout
+
+    // 直接重置数据即可，这是瞬间完成的
     setFormData({
       id: "",
       username: "",
@@ -216,32 +223,38 @@ export default function Employee() {
       sex: "1",
       idNumber: "",
     });
-    setFormErrors({});
-    setFormDialogOpen(true);
   };
 
   // 打开修改员工表单
   const handleOpenEditForm = async (employee: Employee) => {
     setIsEditMode(true);
-    setFormLoading(true);
+    setFormErrors({});
+    setFormDialogOpen(true); // ✅ 立即弹窗
+    setFormLoading(true); // ✅ 立即显示骨架屏/转圈
+
     try {
       const employeeDetail = await getEmployeeByIdAPI(employee.id);
+
       setFormData({
         id: employeeDetail.id,
         username: employeeDetail.username,
         name: employeeDetail.name,
         phone: employeeDetail.phone,
-        sex: employeeDetail.sex,
+        // 🚨 再次提醒：如果后端返回数字，这里记得转字符串，否则 Radio 选不中
+        sex: String(employeeDetail.sex),
         idNumber: employeeDetail.idNumber,
       });
-      setFormErrors({});
-      setFormDialogOpen(true);
+
+      // ❌ 这里不用写 setFormLoading(false) 了
     } catch (error) {
       console.error("获取员工详情失败:", error);
-      toast.error("获取员工详情失败", {
-        description: getErrorMessage(error) || "请稍后重试",
-      });
+      toast.error("获取员工详情失败");
+      setFormDialogOpen(false); // 失败了关掉弹窗是合理的
+
+      // ❌ 这里也不用写 setFormLoading(false) 了
     } finally {
+      // ✅ 放在这里！
+      // 只要 try 跑完了，或者 catch 跑完了，这一行一定会执行
       setFormLoading(false);
     }
   };
@@ -777,7 +790,7 @@ export default function Employee() {
               取消
             </Button>
             <Button onClick={handleSubmitForm} disabled={formLoading}>
-              {formLoading ? "提交中..." : "确定"}
+              {formLoading ? "加载中..." : "确定"}
             </Button>
           </DialogFooter>
         </DialogContent>
