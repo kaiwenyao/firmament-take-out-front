@@ -34,12 +34,12 @@ const handleTokenExpired = () => {
     // 核心区别：使用 navigate 进行无刷新跳转
     const navigate = getNavigate();
     if (navigate) {
-      navigate('/login', { replace: true });
+      navigate("/login", { replace: true });
     } else {
       // 如果 navigate 未初始化，使用 window.location 作为后备方案
-      window.location.href = '/login';
+      window.location.href = "/login";
     }
-    
+
     // 重置锁
     isHandlingTokenExpired = false;
   }, 1000);
@@ -71,8 +71,8 @@ instance.interceptors.response.use(
       return res.data; // 直接返回数据核心部分
     } else {
       // 如果 code 不为 1，代表业务错误（比如"用户名已存在"）
-      const errorMsg:string = res.msg || "网络异常";
-      console.error(errorMsg);
+      const errorMsg: string = res.msg || "操作失败";
+      toast.error(errorMsg); // 统一显示错误提示给用户
       return Promise.reject(new Error(errorMsg));
     }
   },
@@ -89,7 +89,7 @@ instance.interceptors.response.use(
     // 处理网络错误或其他错误
     const errorMessage =
       error.response?.data?.msg || error.message || "网络异常";
-    console.error(errorMessage);
+    toast.error(errorMessage); // 统一显示错误提示给用户
     return Promise.reject(new Error(errorMessage));
   }
 );
