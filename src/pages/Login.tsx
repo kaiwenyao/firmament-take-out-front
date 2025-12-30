@@ -44,11 +44,12 @@ export default function Login() {
       // 保存 token 到 localStorage
       if (response.token) {
         localStorage.setItem("token", response.token);
+        localStorage.setItem("refreshToken", response.refreshToken);  // ⭐ 保存 Refresh Token
         // 可以保存其他用户信息
         localStorage.setItem("userName", response.userName);
         localStorage.setItem("name", response.name);
         localStorage.setItem("userId", response.id.toString());
-        
+
         toast.success("登录成功");
         // 跳转到首页
         navigate("/dashboard", { replace: true });

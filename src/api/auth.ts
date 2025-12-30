@@ -12,6 +12,7 @@ export interface EmployeeLoginVO {
   userName: string;
   name: string;
   token: string;
+  refreshToken: string;  // ⭐ 新增 Refresh Token
 }
 
 /**
@@ -38,6 +39,7 @@ export const employeeLogoutAPI = async (): Promise<void> => {
   } finally {
     // 清除本地存储的 token 和用户信息
     localStorage.removeItem("token");
+    localStorage.removeItem("refreshToken");  // ⭐ 清除 Refresh Token
     localStorage.removeItem("userName");
     localStorage.removeItem("name");
     localStorage.removeItem("userId");
