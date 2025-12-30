@@ -34,9 +34,9 @@ export function useWebSocket(options: WebSocketOptions) {
   const maxRetries = 10;
   const reconnectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const connectRef = useRef<(() => void) | null>(null);
-  
+
   // 1. 新增：追踪组件挂载状态，防止卸载后更新 State
-  const isUnmountedRef = useRef(false); 
+  const isUnmountedRef = useRef(false);
 
   const callbacksRef = useRef({ onOpen, onClose, onError, onMessage });
   useEffect(() => {
@@ -48,7 +48,7 @@ export function useWebSocket(options: WebSocketOptions) {
       clearTimeout(reconnectTimerRef.current);
       reconnectTimerRef.current = null;
     }
-    
+
     if (ws.current) {
       try {
         if (
@@ -84,7 +84,7 @@ export function useWebSocket(options: WebSocketOptions) {
       oldSocket.onmessage = null;
       oldSocket.onerror = null;
       oldSocket.onclose = null;
-      
+
       try {
         oldSocket.close(1000, "被新连接接管");
       } catch {
@@ -98,7 +98,7 @@ export function useWebSocket(options: WebSocketOptions) {
     try {
       // 修复：检查是否卸载
       if (!isUnmountedRef.current) setStatus(WebSocketStatus.CONNECTING);
-      
+
       const socket = new WebSocket(wsUrl);
       ws.current = socket;
 
@@ -121,18 +121,26 @@ export function useWebSocket(options: WebSocketOptions) {
         // 关键点：即使 socket 匹配，如果组件卸载了，也绝对不能 setStatus
         if (ws.current === socket) {
           ws.current = null;
-          
+
           if (!isUnmountedRef.current) {
             setStatus(WebSocketStatus.CLOSED);
             callbacksRef.current.onClose?.();
           }
 
-          if (event.code !== 1000 && retryCountRef.current < maxRetries && !isUnmountedRef.current) {
-            const delay = Math.min(1000 * Math.pow(2, retryCountRef.current), 30000);
+          if (
+            event.code !== 1000 &&
+            retryCountRef.current < maxRetries &&
+            !isUnmountedRef.current
+          ) {
+            const delay = Math.min(
+              1000 * Math.pow(2, retryCountRef.current),
+              30000
+            );
             retryCountRef.current += 1;
-            
-            if (reconnectTimerRef.current) clearTimeout(reconnectTimerRef.current);
-            
+
+            if (reconnectTimerRef.current)
+              clearTimeout(reconnectTimerRef.current);
+
             reconnectTimerRef.current = setTimeout(() => {
               // 再次检查卸载状态
               if (!isUnmountedRef.current && connectRef.current) {
@@ -179,7 +187,7 @@ export function useWebSocket(options: WebSocketOptions) {
   // --- 生命周期管理 ---
   useEffect(() => {
     // 每次副作用执行，重置卸载标记（应对 React 18 Strict Mode 的多次挂载）
-    isUnmountedRef.current = false; 
+    isUnmountedRef.current = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
     if (autoConnect) {
@@ -195,14 +203,14 @@ export function useWebSocket(options: WebSocketOptions) {
     return () => {
       // 2. 标记组件已卸载
       isUnmountedRef.current = true;
-      
+
       if (timer !== undefined) clearTimeout(timer);
-      
+
       if (reconnectTimerRef.current) {
         clearTimeout(reconnectTimerRef.current);
         reconnectTimerRef.current = null;
       }
-      
+
       retryCountRef.current = maxRetries + 1;
 
       // 3. 安全清理
@@ -210,7 +218,7 @@ export function useWebSocket(options: WebSocketOptions) {
         // 在这里，我们其实可以直接暴力 close，因为 isUnmountedRef 已经是 true 了，
         // 就算触发 onclose，上面的逻辑也会拦截 setStatus
         try {
-            ws.current.close(1000, "组件卸载");
+          ws.current.close(1000, "组件卸载");
         } catch {
           // ignore
         }
